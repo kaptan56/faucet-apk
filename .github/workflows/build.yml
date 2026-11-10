@@ -3,6 +3,7 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,22 +11,25 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
+          distribution: 'zulu'
           java-version: '17'
-          distribution: 'temurin'
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
-          
+
       - name: Projeyi Oluştur
         run: flutter create --project-name faucet_app --platforms android .
-        
+
       - name: Bağımlılıkları Yükle
         run: flutter pub get
 
-      - name: İnternet İzni ve Proguard Ayarını Ekle
+      - name: İnternet İzni ve Cleartext Trafik Ayarı Ekle
         run: |
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+
+      - name: Proguard Uyumsuzluğunu Gider
+        run: |
           echo "android.r8.proguardAndroidTxt.disallowed=false" >> android/gradle.properties
 
       - name: APK Derle
