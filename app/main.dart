@@ -1,0 +1,71 @@
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: const WebViewScreen(),
+    );
+  }
+}
+
+class WebViewScreen extends StatefulWidget {
+  const WebViewScreen({super.key});
+  @override
+  State<WebViewScreen> createState() => _WebViewScreenState();
+}
+
+class _WebViewScreenState extends State<WebViewScreen> {
+  late final WebViewController controller;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      // YouTube otomatik oynatma ve sayaç için bu ayar ŞART:
+      ..setMediaPlaybackRequiresUserGesture(false) 
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) => setState(() => isLoading = true),
+          onPageFinished: (_) => setState(() => isLoading = false),
+          onNavigationRequest: (request) {
+            if (request.url.startsWith('https://bilgilerburda.com')) {
+              return NavigationDecision.navigate;
+            }
+            launchUrl(Uri.parse(request.url), mode: LaunchMode.externalApplication);
+            return NavigationDecision.prevent;
+          },
+        ),
+      )
+      // SİTE ADRESİMİZ:
+      ..loadRequest(Uri.parse('https://bilgilerburda.com/faucet'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        if (await controller.canGoBack()) {
+          controller.goBack();
+        }
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : WebViewWidget(controller: controller),
+        ),
+      ),
+    );
+  }
+}
