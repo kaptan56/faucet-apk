@@ -19,19 +19,158 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Android Klasörünü Oluştur
+      - name: Projeyi Oluştur
         run: flutter create --project-name faucet_app --platforms android .
+
+      - name: Tüm Ayarları ve Kodu Sıfırdan Yaz
+        run: |
+          # 1. Pubspec.yaml
+          cat << 'EOF' > pubspec.yaml
+          name: faucet_app
+          description: Faucet App
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            flutter_inappwebview: ^6.1.5
+            url_launcher: ^6.2.6
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # 2. main.dart (InAppWebView)
+          cat << 'EOF' > lib/main.dart
+          import 'package:flutter/material.dart';
+          import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+          import 'package:url_launcher/url_launcher.dart';
+
+          void main() => runApp(const MyApp());
+
+          class MyApp extends StatelessWidget {
+            const MyApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                home: const WebViewScreen(),
+              );
+            }
+          }
+
+          class WebViewScreen extends StatefulWidget {
+            const WebViewScreen({super.key});
+            @override
+            State<WebViewScreen> createState() => _WebViewScreenState();
+          }
+
+          class _WebViewScreenState extends State<WebViewScreen> {
+            InAppWebViewController? webViewController;
+            bool isLoading = true;
+
+            @override
+            Widget build(BuildContext context) {
+              return PopScope(
+                canPop: false,
+                onPopInvoked: (didPop) async {
+                  if (didPop) return;
+                  if (await webViewController?.canGoBack() ?? false) {
+                    webViewController?.goBack();
+                  }
+                },
+                child: Scaffold(
+                  body: SafeArea(
+                    child: Stack(
+                      children: [
+                        InAppWebView(
+                          initialUrlRequest: URLRequest(url: WebUri('https://bilgilerburda.com/faucet')),
+                          initialSettings: InAppWebViewSettings(
+                            javaScriptEnabled: true,
+                            mediaPlaybackRequiresUserGesture: false,
+                            useShouldOverrideUrlLoading: true,
+                            domStorageEnabled: true,
+                            databaseEnabled: true,
+                          ),
+                          onWebViewCreated: (controller) { webViewController = controller; },
+                          onLoadStart: (controller, url) { setState(() => isLoading = true); },
+                          onLoadStop: (controller, url) async {
+                            setState(() => isLoading = false);
+                            if (controller.platform is AndroidInAppWebViewController) {
+                              await (controller.platform as AndroidInAppWebViewController).resumeTimers();
+                            }
+                          },
+                          shouldOverrideUrlLoading: (controller, navigationAction) async {
+                            var uri = navigationAction.request.url;
+                            if (uri != null && !uri.toString().startsWith('https://bilgilerburda.com')) {
+                              launchUrl(uri, mode: LaunchMode.externalApplication);
+                              return NavigationActionPolicy.CANCEL;
+                            }
+                            return NavigationActionPolicy.ALLOW;
+                          },
+                        ),
+                        if (isLoading) const Center(child: CircularProgressIndicator()),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+          # 3. build.gradle (SDK 34 ve 19 ayarları)
+          cat << 'EOF' > android/app/build.gradle
+          def localProperties = new Properties()
+          def localPropertiesFile = rootProject.file('local.properties')
+          if (localPropertiesFile.exists()) {
+              localPropertiesFile.withReader('UTF-8') { reader ->
+                  localProperties.load(reader)
+              }
+          }
+          def flutterRoot = localProperties.getProperty('flutter.sdk')
+          if (flutterRoot == null) {
+              throw new GradleException("Flutter SDK not found.")
+          }
+          def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+          def flutterVersionName = localProperties.getProperty('flutter.versionName')
+          apply plugin: 'com.android.application'
+          apply plugin: 'kotlin-android'
+          apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+          android {
+              namespace "com.example.faucet_app"
+              compileSdk 34
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = '17' }
+              defaultConfig {
+                  applicationId "com.example.faucet_app"
+                  minSdk 19
+                  targetSdk 34
+                  versionCode flutterVersionCode.toInteger()
+                  versionName flutterVersionName
+              }
+              buildTypes {
+                  release { signingConfig signingConfigs.debug }
+              }
+          }
+          flutter { source '../..' }
+          dependencies {
+              implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+          }
+          EOF
+
+          # 4. İnternet İzni
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
       - name: Bağımlılıkları Yükle
         run: flutter pub get
-
-      - name: İnternet İzni Ekle
-        run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
-
-      - name: InAppWebView Android Ayarlarını Yap
-        run: |
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 19/' android/app/build.gradle
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/' android/app/build.gradle
 
       - name: APK Derle
         run: flutter build apk --release
