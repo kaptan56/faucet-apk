@@ -1,10 +1,8 @@
 name: Build APK
-
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,8 +10,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
           java-version: '17'
+          distribution: 'temurin'
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -24,9 +22,11 @@ jobs:
         
       - name: Bağımlılıkları Yükle
         run: flutter pub get
-        
-      - name: İnternet İzni Ekle
-        run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+
+      - name: İnternet İzni ve Proguard Ayarını Ekle
+        run: |
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+          echo "android.r8.proguardAndroidTxt.disallowed=false" >> android/gradle.properties
 
       - name: APK Derle
         run: flutter build apk --release
