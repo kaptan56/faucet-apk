@@ -21,7 +21,7 @@ jobs:
           channel: 'stable'
           cache: true
       - name: Eksik Android Dosyalarını Oluştur
-        run: flutter create .
+        run: flutter create --project-name faucet_app .
       - name: Bağımlılıkları Yükle
         run: flutter pub get
       - name: APK Derle
