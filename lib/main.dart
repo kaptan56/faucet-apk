@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const MyApp());
@@ -23,34 +22,8 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  late final WebViewController controller;
+  InAppWebViewController? webViewController;
   bool isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) => setState(() => isLoading = true),
-          onPageFinished: (_) => setState(() => isLoading = false),
-          onNavigationRequest: (request) {
-            if (request.url.startsWith('https://bilgilerburda.com')) {
-              return NavigationDecision.navigate;
-            }
-            launchUrl(Uri.parse(request.url), mode: LaunchMode.externalApplication);
-            return NavigationDecision.prevent;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse('https://bilgilerburda.com/faucet'));
-
-    if (controller.platform is AndroidWebViewController) {
-      (controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,15 +31,50 @@ class _WebViewScreenState extends State<WebViewScreen> {
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (await controller.canGoBack()) {
-          controller.goBack();
+        if (await webViewController?.canGoBack() ?? false) {
+          webViewController?.goBack();
         }
       },
       child: Scaffold(
         body: SafeArea(
-          child: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : WebViewWidget(controller: controller),
+          child: Stack(
+            children: [
+              InAppWebView(
+                initialUrlRequest: URLRequest(url: WebUri('https://bilgilerburda.com/faucet')),
+                initialSettings: InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                  useShouldOverrideUrlLoading: true,
+                  domStorageEnabled: true,
+                  databaseEnabled: true,
+                  transparentBackground: true,
+                ),
+                onWebViewCreated: (controller) {
+                  webViewController = controller;
+                },
+                onLoadStart: (controller, url) {
+                  setState(() => isLoading = true);
+                },
+                onLoadStop: (controller, url) async {
+                  setState(() => isLoading = false);
+                  // JavaScript zamanlayıcılarını (timer) yeniden başlat
+                  if (controller.platform is AndroidInAppWebViewController) {
+                    await (controller.platform as AndroidInAppWebViewController).resumeTimers();
+                  }
+                },
+                shouldOverrideUrlLoading: (controller, navigationAction) async {
+                  var uri = navigationAction.request.url;
+                  if (uri != null && !uri.toString().startsWith('https://bilgilerburda.com')) {
+                    launchUrl(uri, mode: LaunchMode.externalApplication);
+                    return NavigationActionPolicy.CANCEL;
+                  }
+                  return NavigationActionPolicy.ALLOW;
+                },
+              ),
+              if (isLoading)
+                const Center(child: CircularProgressIndicator()),
+            ],
+          ),
         ),
       ),
     );
