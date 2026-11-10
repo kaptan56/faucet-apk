@@ -1,75 +1,38 @@
-import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:url_launcher/url_launcher.dart';
+name: Build APK
 
-void main() => runApp(const MyApp());
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const WebViewScreen(),
-    );
-  }
-}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
 
-class WebViewScreen extends StatefulWidget {
-  const WebViewScreen({super.key});
-  @override
-  State<WebViewScreen> createState() => _WebViewScreenState();
-}
+      - name: Android Klasörünü Oluştur
+        run: flutter create --project-name faucet_app --platforms android .
 
-class _WebViewScreenState extends State<WebViewScreen> {
-  late final WebViewController controller;
-  bool isLoading = true;
+      - name: Bağımlılıkları Yükle
+        run: flutter pub get
 
-  @override
-  void initState() {
-    super.initState();
-    controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) => setState(() => isLoading = true),
-          onPageFinished: (_) => setState(() => isLoading = false),
-          onNavigationRequest: (request) {
-            if (request.url.startsWith('https://bilgilerburda.com')) {
-              return NavigationDecision.navigate;
-            }
-            launchUrl(Uri.parse(request.url), mode: LaunchMode.externalApplication);
-            return NavigationDecision.prevent;
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse('https://bilgilerburda.com/faucet'));
+      - name: İnternet İzni Ekle
+        run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
-    // Android'de otomatik oynatma için gerekli ayar
-    if (controller.platform is AndroidWebViewController) {
-      (controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
-  }
+      - name: APK Derle
+        run: flutter build apk --release
 
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        if (await controller.canGoBack()) {
-          controller.goBack();
-        }
-      },
-      child: Scaffold(
-        body: SafeArea(
-          child: isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : WebViewWidget(controller: controller),
-        ),
-      ),
-    );
-  }
-}
+      - name: APK'yı Yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
