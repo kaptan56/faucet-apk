@@ -28,6 +28,11 @@ jobs:
       - name: İnternet İzni Ekle
         run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
 
+      - name: InAppWebView Android Ayarlarını Yap
+        run: |
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 19/' android/app/build.gradle
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/' android/app/build.gradle
+
       - name: APK Derle
         run: flutter build apk --release
 
