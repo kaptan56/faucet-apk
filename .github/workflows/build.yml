@@ -24,6 +24,8 @@ jobs:
         run: flutter create --project-name faucet_app .
       - name: Bağımlılıkları Yükle
         run: flutter pub get
+      - name: İnternet İzni Ekle
+        run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
       - name: APK Derle
         run: flutter build apk --release
       - name: APK'yı Artifact Olarak Yükle
