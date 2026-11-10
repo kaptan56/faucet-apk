@@ -10,24 +10,137 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Eski Karışık Dosyaları Temizle
+        run: |
+          rm -rf app
+          rm -f build.gradle.kts settings.gradle.kts gradlew gradle.properties
+          
       - name: Java 17 Kurulumu
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
+          
       - name: Flutter Kurulumu
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
-      - name: Eksik Android Dosyalarını Oluştur
+          
+      - name: Flutter Projesi Oluştur
         run: flutter create --project-name faucet_app .
+        
+      - name: Kodu ve Ayarları Doğru Yere Yaz
+        run: |
+          cat > lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:webview_flutter/webview_flutter.dart';
+          import 'package:url_launcher/url_launcher.dart';
+
+          void main() => runApp(const MyApp());
+
+          class MyApp extends StatelessWidget {
+            const MyApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                home: const WebViewScreen(),
+              );
+            }
+          }
+
+          class WebViewScreen extends StatefulWidget {
+            const WebViewScreen({super.key});
+            @override
+            State<WebViewScreen> createState() => _WebViewScreenState();
+          }
+
+          class _WebViewScreenState extends State<WebViewScreen> {
+            late final WebViewController controller;
+            bool isLoading = true;
+
+            @override
+            void initState() {
+              super.initState();
+              controller = WebViewController()
+                ..setJavaScriptMode(JavaScriptMode.unrestricted)
+                ..setMediaPlaybackRequiresUserGesture(false) 
+                ..setNavigationDelegate(
+                  NavigationDelegate(
+                    onPageStarted: (_) => setState(() => isLoading = true),
+                    onPageFinished: (_) => setState(() => isLoading = false),
+                    onNavigationRequest: (request) {
+                      if (request.url.startsWith('https://bilgilerburda.com')) {
+                        return NavigationDecision.navigate;
+                      }
+                      launchUrl(Uri.parse(request.url), mode: LaunchMode.externalApplication);
+                      return NavigationDecision.prevent;
+                    },
+                  ),
+                )
+                ..loadRequest(Uri.parse('https://bilgilerburda.com/faucet'));
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return PopScope(
+                canPop: false,
+                onPopInvoked: (didPop) async {
+                  if (didPop) return;
+                  if (await controller.canGoBack()) {
+                    controller.goBack();
+                  }
+                },
+                child: Scaffold(
+                  body: SafeArea(
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : WebViewWidget(controller: controller),
+                  ),
+                ),
+              );
+            }
+          }
+          EOF
+
+          cat > pubspec.yaml << 'EOF'
+          name: faucet_app
+          description: Faucet App
+          publish_to: 'none'
+          version: 1.0.0+1
+
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            webview_flutter: ^4.7.0
+            permission_handler: ^11.3.1
+            url_launcher: ^6.2.6
+            connectivity_plus: ^6.0.3
+            file_picker: ^8.0.3
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^3.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
       - name: Bağımlılıkları Yükle
         run: flutter pub get
+        
       - name: İnternet İzni Ekle
         run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
+        
       - name: APK Derle
         run: flutter build apk --release
+        
       - name: APK'yı Artifact Olarak Yükle
         uses: actions/upload-artifact@v4
         with:
