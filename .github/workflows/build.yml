@@ -20,6 +20,8 @@ jobs:
         with:
           channel: 'stable'
           cache: true
+      - name: Eksik Android Dosyalarını Oluştur
+        run: flutter create .
       - name: Bağımlılıkları Yükle
         run: flutter pub get
       - name: APK Derle
