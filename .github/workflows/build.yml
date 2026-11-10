@@ -10,137 +10,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Eski Karışık Dosyaları Temizle
         run: |
           rm -rf app
+          rm -rf lib
           rm -f build.gradle.kts settings.gradle.kts gradlew gradle.properties
-          
+
       - name: Java 17 Kurulumu
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-          
+
       - name: Flutter Kurulumu
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
-          
+
       - name: Flutter Projesi Oluştur
         run: flutter create --project-name faucet_app .
-        
+
       - name: Kodu ve Ayarları Doğru Yere Yaz
         run: |
-          cat > lib/main.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import 'package:webview_flutter/webview_flutter.dart';
-          import 'package:url_launcher/url_launcher.dart';
-
-          void main() => runApp(const MyApp());
-
-          class MyApp extends StatelessWidget {
-            const MyApp({super.key});
-            @override
-            Widget build(BuildContext context) {
-              return MaterialApp(
-                debugShowCheckedModeBanner: false,
-                home: const WebViewScreen(),
-              );
-            }
-          }
-
-          class WebViewScreen extends StatefulWidget {
-            const WebViewScreen({super.key});
-            @override
-            State<WebViewScreen> createState() => _WebViewScreenState();
-          }
-
-          class _WebViewScreenState extends State<WebViewScreen> {
-            late final WebViewController controller;
-            bool isLoading = true;
-
-            @override
-            void initState() {
-              super.initState();
-              controller = WebViewController()
-                ..setJavaScriptMode(JavaScriptMode.unrestricted)
-                ..setMediaPlaybackRequiresUserGesture(false) 
-                ..setNavigationDelegate(
-                  NavigationDelegate(
-                    onPageStarted: (_) => setState(() => isLoading = true),
-                    onPageFinished: (_) => setState(() => isLoading = false),
-                    onNavigationRequest: (request) {
-                      if (request.url.startsWith('https://bilgilerburda.com')) {
-                        return NavigationDecision.navigate;
-                      }
-                      launchUrl(Uri.parse(request.url), mode: LaunchMode.externalApplication);
-                      return NavigationDecision.prevent;
-                    },
-                  ),
-                )
-                ..loadRequest(Uri.parse('https://bilgilerburda.com/faucet'));
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return PopScope(
-                canPop: false,
-                onPopInvoked: (didPop) async {
-                  if (didPop) return;
-                  if (await controller.canGoBack()) {
-                    controller.goBack();
-                  }
-                },
-                child: Scaffold(
-                  body: SafeArea(
-                    child: isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : WebViewWidget(controller: controller),
-                  ),
-                ),
-              );
-            }
-          }
-          EOF
-
-          cat > pubspec.yaml << 'EOF'
-          name: faucet_app
-          description: Faucet App
-          publish_to: 'none'
-          version: 1.0.0+1
-
-          environment:
-            sdk: '>=3.0.0 <4.0.0'
-
-          dependencies:
-            flutter:
-              sdk: flutter
-            webview_flutter: ^4.7.0
-            permission_handler: ^11.3.1
-            url_launcher: ^6.2.6
-            connectivity_plus: ^6.0.3
-            file_picker: ^8.0.3
-
-          dev_dependencies:
-            flutter_test:
-              sdk: flutter
-            flutter_lints: ^3.0.0
-
-          flutter:
-            uses-material-design: true
-          EOF
+          echo "aW1wb3J0ICdwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCc7CmltcG9ydCAncGFja2FnZTp3ZWJ2aWV3X2ZsdXR0ZXIvd2Vidmlld19mbHV0dGVyLmRhcnQnOwppbXBvcnQgJ3BhY2thZ2U6dXJsX2xhdW5jaGVyL3VybF9sYXVuY2hlci5kYXJ0JzsKCnZvaWQgbWFpbigpID0+IHJ1bkFwcChjb25zdCBNeUFwcCgpKTsKCmNsYXNzIE15QXBwIGV4dGVuZHMgU3RhdGVsZXNzV2lkZ2V0IHsKICBjb25zdCBNeUFwcCh7c3VwZXIua2V5fSk7CiAgQFVudGVybm92ZXIKICBXaWRnZXQgYnVpbGQoQnVpbGRDb250ZXh0IGNvbnRleHQpIHsKICAgIHJldHVybiBNYXRlcmlhbEFwcCgKICAgICAgZGVidWdTaG93Q2hlY2tlZE1vZGVCYW5uZXI6IGZhbHNlLAogICAgICBob21lOiBjb25zdCBXZWJWaWV3U2NyZWVuKCksCiAgICApOwogIH0KfQoKY2xhc3MgV2ViVmlld1NjcmVlbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBjb25zdCBXZWJWaWV3U2NyZWVuKHtzdXBlci5rZXl9KTsKICBAVW50ZXJub3ZlCiAgU3RhdGU8V2ViVmlld1NjcmVlbj4gY3JlYXRlU3RhdGUoKSA9PiBfV2ViVmlld1NjcmVlblN0YXRlKCk7Cn0KCmNsYXNzIF9XZWJWaWV3U2NyZWVuU3RhdGUgZXh0ZW5kcyBTdGF0ZTxXZWJWaWV3U2NyZWVuPiB7CiAgbGF0ZSBmaW5hbCBXZWJWaWV3Q29udHJvbGxlciBjb250cm9sbGVyOwogIGJvb2wgaXNMb2FkaW5nID0gdHJ1ZTsKCiAgQFVudGVybm92ZXIKICB2b2lkIGluaXRTdGF0ZSgpIHsKICAgIHN1cGVyLmluaXRTdGF0ZSgpOwogICAgY29udHJvbGxlciA9IFdlYlZpZXdDb250cm9sbGVyKCkKICAgICAgLi5zZXRKYXZhU2NyaXB0TW9kZShKYXZhU2NyaXB0TW9kZS51bnJlc3RyaWN0ZWQpCiAgICAgIC4uc2V0TWVkaWFQbGF5YmFja1JlcXVpcmVzVXNlckdlc3R1cmUoZmFsc2UpIAogICAgICAuLnNldE5hdmlnYXRpb25EZWxlZ2F0ZSgKICAgICAgICBOYXZpZ2F0aW9uRGVsZWdhdGUoCiAgICAgICAgICBvblBhZ2VTdGFydGVkOiAoXykgPT4gc2V0U3RhdGUoKCkgPT4gaXNMb2FkaW5nID0gdHJ1ZSksCiAgICAgICAgICBvblBhZ2VGaW5pc2hlZDogKF8pID0+IHNldFN0YXRlKCgpID0+IGlzTG9hZGluZyA9IGZhbHNlKSwKICAgICAgICAgIG9uTmF2aWdhdGlvblJlcXVlc3Q6IChyZXF1ZXN0KSB7CiAgICAgICAgICAgIGlmIChyZXF1ZXN0LnVybC5zdGFydHNXaXRoKCdodHRwczovL2JpbGdpbGVyYnVyZGEuY29tJykpIHsKICAgICAgICAgICAgICByZXR1cm4gTmF2aWdhdGlvbkRlY2lzaW9uLm5hdmlnYXRlOwogICAgICAgICAgICB9CiAgICAgICAgICAgIGxhdW5jaFVybChVcmkucGFyc2UocmVxdWVzdC51cmwpLCBtb2RlOiBMYXVuY2hNb2RlLmV4dGVybmFsQXBwbGljYXRpb24pOwogICAgICAgICAgICByZXR1cm4gTmF2aWdhdGlvbkRlY2lzaW9uLnByZXZlbnQ7CiAgICAgICAgICB9LAogICAgICAgICksCiAgICAgICkKICAgICAgLi5sb2FkUmVxdWVzdChVcmkucGFyc2UoJ2h0dHBzOi8vYmlsZ2lsZXJidXJkYS5jb20vZmF1Y2V0JykpOwogIH0KCiAgQFVudGVybm92ZXIKICBXaWRnZXQgYnVpbGQoQnVpbGRDb250ZXh0IGNvbnRleHQpIHsKICAgIHJldHVybiBQb3BTY29wZSgKICAgICAgY2FuUG9wOiBmYWxzZSwKICAgICAgb25Qb3BJbnZva2VkOiAoZGlkUG9wKSBhc3luYyB7CiAgICAgICAgaWYgKGRpZFBvcCkgcmV0dXJuOwogICAgICAgIGlmIChhd2FpdCBjb250cm9sbGVyLmNhbkdvQmFjaygpKSB7CiAgICAgICAgICBjb250cm9sbGVyLmdvQmFjaygpOwogICAgICAgIH0KICAgICAgfSwKICAgICAgY2hpbGQ6IFNjYWZmb2xkKAogICAgICAgIGJvZHk6IFNhZmVBcmVhKAogICAgICAgICAgY2hpbGQ6IGlzTG9hZGluZwogICAgICAgICAgICAgID8gY29uc3QgQ2VudGVyKGNoaWxkOiBDaXJjdWxhclByb2dyZXNzSW5kaWNhdG9yKCkpCiAgICAgICAgICAgICAgOiBXZWJWaWV3V2lkZ2V0KGNvbnRyb2xsZXI6IGNvbnRyb2xsZXIpLAogICAgICAgICksCiAgICAgICksCiAgICApOwogIH0KfQ==" | base64 -d > lib/main.dart
+          
+          echo "bmFtZTogZmF1Y2V0X2FwcApkZXNjcmlwdGlvbjogRmF1Y2V0IEFwcApwdWJsaXNoX3RvOiAnbm9uZScKdmVyc2lvbjogMS4wLjArMQoKZW52aXJvbm1lbnQ6CiAgc2RrOiAnPj0zLjAuMCA8NC4wLjAnCgpkZXBlbmRlbmNpZXM6CiAgZmx1dHRlcjoKICAgIHNkazogZmx1dHRlcgogIHdlYnZpZXdfZmx1dHRlcjogXjQuNy4wCiAgcGVybWlzc2lvbl9oYW5kbGVyOiBeMTEuMy4xCiAgdXJsX2xhdW5jaGVyOiBeNi4yLjYKICBjb25uZWN0aXZpdHlfcGx1czogXjYuMC4zCiAgZmlsZV9waWNrZXI6IF44LjAuMwoKZGV2X2RlcGVuZGVuY2llczoKICBmbHV0dGVyX3Rlc3Q6CiAgICBzZGs6IGZsdXR0ZXIKICBmbHV0dGVyX2xpbnRzOiBeMy4wLjAKCmZsdXR0ZXI6CiAgdXNlcy1tYXRlcmlhbC1kZXNpZ246IHRydWU=" | base64 -d > pubspec.yaml
 
       - name: Bağımlılıkları Yükle
         run: flutter pub get
-        
+
       - name: İnternet İzni Ekle
         run: sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application/' android/app/src/main/AndroidManifest.xml
-        
+
       - name: APK Derle
         run: flutter build apk --release
-        
+
       - name: APK'yı Artifact Olarak Yükle
         uses: actions/upload-artifact@v4
         with:
